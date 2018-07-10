@@ -18,13 +18,9 @@ LEAST_FIT = 0.1
 
 #Initialize module variables
 data = pd.read_csv(DATA)
-population = pd.DataFrame(index=np.arange(0, POP_SIZE), columns=('Player1',   \
-                          'Player2','Player3','Player4','Player5','Player6',  \
-                          'Player7', 'Player8', 'Player9', 'Points', 'Salary',\
-                          'Fitness', 'Norm_fitness', 'Breed_chance',          \
-                          'Compliant'))
-population_stats = pd.DataFrame(index=np.arange(0, 1), columns=('Avg_points', \
-                                'Avg_salary', 'Avg_fitness', 'Max_fitness'))
+population = pd.DataFrame(index=np.arange(0, POP_SIZE), columns=('Player1', 'Player2','Player3','Player4','Player5','Player6',  \
+                          'Player7', 'Player8', 'Player9', 'Points', 'Salary', 'Fitness', 'Norm_fitness', 'Breed_chance', 'Compliant'))
+population_stats = pd.DataFrame(index=np.arange(0, 1), columns=('Avg_points', 'Avg_salary', 'Avg_fitness', 'Max_fitness'))
 
 # Main function that executes the genetci algorithm
 def main():
@@ -48,7 +44,10 @@ def setup():
     for i in np.arange(0, POP_SIZE):
         calculate_fitness(i)
         
-    update_stats()
+    for i in np.arange(0, POP_SIZE):
+        update_norm_fitness(i)
+        
+    update_all_stats()
         
         
             
@@ -59,7 +58,7 @@ def calculate_fitness(index):
     team_points = 0
     team_salary = 0
     pos_count = [0, 0, 0, 0, 0] # QB, RB, WR, TE, Def
-    compliant = true
+    compliant = True
     
     for i in range(TEAM_SIZE):
         player_data = data.loc[data['GID'] == chromosome.iloc[i]]
@@ -71,32 +70,31 @@ def calculate_fitness(index):
     
     if team_salary > SALARY_CAP:
         fitness -= (team_salary - SALARY_CAP)
-        compliant = false
+        compliant = False
         
     if pos_count[0] > NUM_QB:
         fitness -= (pos_count[0] - NUM_QB) * 2000
-        compliant = false
+        compliant = False
         
     if pos_count[1] > NUM_RB:
         fitness -= (pos_count[1] - NUM_RB + 1) * 2000
-        compliant = false
+        compliant = False
         
     if pos_count[2] > NUM_WR:
         fitness -= (pos_count[2] - NUM_WR + 1) * 2000
-        compliant = false
+        compliant = False
         
     if pos_count[3] > NUM_TE:
         fitness -= (pos_count[3] - NUM_TE + 1) * 2000
-        compliant = false
+        compliant = False
         
     if pos_count[4] > NUM_DEF:
         fitness -= (pos_count[4] - NUM_DEF) * 2000
-        compliant = false
+        compliant = False
         
     if pos_count[1] + pos_count[2] + pos_count[3] > NUM_RB + NUM_WR + NUM_QB:
-        fitness -= (pos_count[1] + pos_count[2] + pos_count[3] - NUM_RB +     \
-                    NUM_WR + NUM_QB) * 2000
-        compliant = false
+        fitness -= (pos_count[1] + pos_count[2] + pos_count[3] - NUM_RB + NUM_WR + NUM_QB) * 2000
+        compliant = False
     
     if fitness < LEAST_FIT:
         fitness = LEAST_FIT
@@ -109,23 +107,24 @@ def calculate_fitness(index):
     population.at[index, 'Fitness'] = fitness
     population.at[index, 'Compliant'] = compliant
 
-def update_stats():
+def update_all_stats():
     fitness = 0
     points = 0
     salary = 0
+    compliant = 0
+    
     for i in range(POP_SIZE):
-        chromosome = population.iloc[i]
-        points += chromosome.iloc[9]
-        salary += chromosome.iloc[10]
-        fitness += chromosome.iloc[11]
+        points += population.at[i, 'Points']
+        salary += population.at[i, 'Salary']
+        fitness += population.at[i, 'Fitness']
+        
     
     population_stats.at[0, 'Avg_points'] = points / POP_SIZE
     population_stats.at[0, 'Avg_salary'] = salary / POP_SIZE
     population_stats.at[0, 'Avg_fitness'] = fitness / POP_SIZE
 
-def update_breed_chance(index):
-    population.at[index, 'Norm_fitness'] = fitness / population_stats.at      \
-        [0, 'Max_fitness']
+def update_norm_fitness(index):
+    population.at[index, 'Norm_fitness'] = population.at[index, 'Fitness'] / population_stats.at[0, 'Max_fitness']
         
 
 def pos_dict(x):
