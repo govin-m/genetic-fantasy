@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import random
 
 # Definitions of changeable variables
 DATA = 'data/2017-1.csv'
@@ -18,19 +19,48 @@ LEAST_FIT = 0.1
 
 #Initialize module variables
 data = pd.read_csv(DATA)
-population = pd.DataFrame(index=np.arange(0, POP_SIZE), columns=('Player1', 'Player2','Player3','Player4','Player5','Player6',  \
-                          'Player7', 'Player8', 'Player9', 'Points', 'Salary', 'Fitness', 'Norm_fitness', 'Breed_chance', 'Compliant'))
-population_stats = pd.DataFrame(index=np.arange(0, 1), columns=('Avg_points', 'Avg_salary', 'Avg_fitness', 'Max_fitness'))
+
+# Population dataframe.  PLAYERS 1 - 9 MUST OCCUPY THE 1ST 9 COLUMNS!
+population = pd.DataFrame(index=np.arange(0, POP_SIZE + 1), columns=('Player1', 'Player2','Player3','Player4','Player5','Player6',  \
+                          'Player7', 'Player8', 'Player9', 'Gen_born', 'Points', 'Salary', 'Fitness', 'Compliant', 'Selection_chance'))
+
+# Various stats describing population health
+population_stats = pd.DataFrame(index=np.arange(0, 1), columns=('Avg_points', 'Avg_salary', 'Avg_fitness', 'Total_fitness', 'Max_fitness', 'Num_compliant', 'Avg_age'))
 
 # Main function that executes the genetci algorithm
 def main():
     setup()
+    crossover()
+    print("Success")
+
+# Performs the crossover process, produces new child
+def crossover():
+    parents = select_parents()
+    chromosome_a = population.iloc[parents[0]].values.tolist()
+    chromosome_b = population.iloc[parents[1]].values.tolist()
     
+    print(chromosome_a)
+    print(chromosome_b)
 
+# Selects parents to for offspring production
+def select_parents():
+    parents_selected = 0
+    selected = []
+    
+    while (parents_selected < 2):
+        for i in np.arange(0, POP_SIZE):
+            if random_bool(population.at[i, 'Selection_chance'] * 100):
+                parents_selected += 1
+                selected.append(i)
+                break
+            
+    return selected
 
+# Initial setup of data.  Create random population, calculate all fitnesses, update stats
 def setup():
     
     population_stats.at[0, 'Max_fitness'] = LEAST_FIT
+    random.seed(SEED)
     
     #Fill up our population with random teams
     seed = SEED
@@ -39,18 +69,19 @@ def setup():
             sample = data.sample(random_state = seed)['GID'].values[0]
             population.iloc[i,j] = sample
             seed += 1
+        population.at[i, 'Gen_born'] = 0
             
     #Calculate the fitness of our starting teams
     for i in np.arange(0, POP_SIZE):
         calculate_fitness(i)
         
-    for i in np.arange(0, POP_SIZE):
-        update_norm_fitness(i)
-        
     update_all_stats()
+    
+    for i in np.arange(0, POP_SIZE):
+        update_selection_probability(i)
+    
         
-        
-            
+#Update the fitness and related information for a given individual referred to by index within the population          
 def calculate_fitness(index):
     chromosome = population.iloc[index]
 
@@ -95,6 +126,9 @@ def calculate_fitness(index):
     if pos_count[1] + pos_count[2] + pos_count[3] > NUM_RB + NUM_WR + NUM_QB:
         fitness -= (pos_count[1] + pos_count[2] + pos_count[3] - NUM_RB + NUM_WR + NUM_QB) * 2000
         compliant = False
+        
+    if compliant == True:
+        fitness += 10000
     
     if fitness < LEAST_FIT:
         fitness = LEAST_FIT
@@ -107,24 +141,41 @@ def calculate_fitness(index):
     population.at[index, 'Fitness'] = fitness
     population.at[index, 'Compliant'] = compliant
 
+#Update the stats for all population.  Done at start of program
 def update_all_stats():
     fitness = 0
     points = 0
+    age = 0
     salary = 0
     compliant = 0
     
     for i in range(POP_SIZE):
         points += population.at[i, 'Points']
         salary += population.at[i, 'Salary']
+        age += population.at[i, 'Gen_born']
         fitness += population.at[i, 'Fitness']
-        
-    
+        if population.at[i, 'Compliant'] == True:
+            compliant += 1
+
     population_stats.at[0, 'Avg_points'] = points / POP_SIZE
     population_stats.at[0, 'Avg_salary'] = salary / POP_SIZE
+    population_stats.at[0, 'Avg_age'] = age / POP_SIZE
     population_stats.at[0, 'Avg_fitness'] = fitness / POP_SIZE
+    population_stats.at[0, 'Total_fitness'] = fitness
+    population_stats.at[0, 'Num_compliant'] = compliant
 
-def update_norm_fitness(index):
-    population.at[index, 'Norm_fitness'] = population.at[index, 'Fitness'] / population_stats.at[0, 'Max_fitness']
+# Update the stats dataframe by removing information of least fit individual and adding information of new child
+#def update_stats(add, remove):
+
+
+# Update the selection chance for a given index    
+def update_selection_probability(index):
+    probability = population.at[index, 'Fitness'] / population_stats.at[0, 'Total_fitness']
+    population.at[index, 'Selection_chance'] = probability
+    
+# Returns random bool based on percentage
+def random_bool(percent):
+    return random.randrange(100) < percent
         
 
 def pos_dict(x):
