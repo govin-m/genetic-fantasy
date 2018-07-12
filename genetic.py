@@ -26,7 +26,7 @@ data = pd.read_csv(DATA)
 population = pd.DataFrame(index=np.arange(0, POP_SIZE), columns=('Player1', 'Player2','Player3','Player4','Player5','Player6',  \
                           'Player7', 'Player8', 'Player9', 'Gen_born', 'Points', 'Salary', 'Fitness', 'Compliant', 'Selection_chance'))
 
-temp_offspring = pd.DataFrame(index=np.arange(0, 1), columns=('Player1', 'Player2','Player3','Player4','Player5','Player6',  \
+temp_offspring = pd.DataFrame(index=np.arange(0, 2), columns=('Player1', 'Player2','Player3','Player4','Player5','Player6',  \
                           'Player7', 'Player8', 'Player9', 'Gen_born', 'Points', 'Salary', 'Fitness', 'Compliant', 'Selection_chance'))
 
 # Various stats describing population health
@@ -44,14 +44,14 @@ def main():
 def crossover(generation):
     
     # Identify individual to be replaced
-    index = find_weakest()
-    seed = SEED    
+    index = find_weakest(None)
+    index2 = find_weakest(index)    # Identify 2nd individual to be replaced
     
-    if generation == 44:
-        print("test")
+    seed = SEED    
     
     # Get the parent genotypes encoded into a list of two lists
     parent_index = select_parents()
+    
     parent_chromosomes = []
     offspring_chromosome = []
     parent_chromosomes.append(population.iloc[parent_index[0]].values.tolist())
@@ -79,14 +79,47 @@ def crossover(generation):
     if random_bool(PERCENT_CHANCE_MUTATE):
         mutate(temp_offspring, 0, seed)
         
-    add_child_to_population_cull_weakest(index)
+    add_child_to_population_cull_weakest(0, index)
+    
+    #CODE FOR PRODUCING 'BEST' OFFSPRING FROM THE FITTEST PARENTS
+    # Get the parent genotypes encoded into a list of two lists
+    parent_index2 = select_best_parents()
+    
+    parent_chromosomes2 = []
+    offspring_chromosome2 = []
+    parent_chromosomes2.append(population.iloc[parent_index2[0]].values.tolist())
+    parent_chromosomes2.append(population.iloc[parent_index2[1]].values.tolist())
+    
+    #print('Parent A')
+    #print(population.iloc[parent_index[0]])
+    #print('Parent B')
+    #print(population.iloc[parent_index[1]])
+
+    # Randomly select genes from both parents to create offspring
+    for i in range(TEAM_SIZE):
+        offspring_chromosome2.append(parent_chromosomes2[random.randint(0, 1)][i])
+    
+    #Append the generation born information
+    offspring_chromosome2.append(generation)
+    
+    # Append empty values for the meta-information carried by each individual
+    for i in range(5):
+        offspring_chromosome2.append(None)
+    
+    # Place the offspring into the empty row reserved for children
+    temp_offspring.iloc[1] = offspring_chromosome2
+    
+    if random_bool(PERCENT_CHANCE_MUTATE):
+        mutate(temp_offspring, 1, seed)
+        
+    add_child_to_population_cull_weakest(1, index2)
     
 #Mutate random element of offspring
 def mutate(df, index, seed):
     pos = random.randint(0, TEAM_SIZE - 1)
     df.iloc[index, pos] = data.sample(random_state = seed)['GID'].values[0]
 
-# Selects parents to for offspring production
+# Selects parents for offspring production - roulette
 def select_parents():
     parents_selected = 0
     selected = []
@@ -97,6 +130,17 @@ def select_parents():
                 parents_selected += 1
                 selected.append(i)
                 break
+            
+    return selected
+
+# Selects parents for offspring production - best
+def select_best_parents():
+    selected = []
+    
+    i = find_strongest(None)
+    selected.append(i)
+    j = find_strongest(i)
+    selected.append(j)
             
     return selected
 
@@ -216,7 +260,7 @@ def update_all_stats():
 # Assumes child has been created and is in temp_offspring
 # Removes weakest member from population, removes it's stats from pop stats.
 # Adds child to population, updates it's stats
-def add_child_to_population_cull_weakest(index):
+def add_child_to_population_cull_weakest(offspring_num, index):
     
     # Subtract the population adjusted stats of the culled individual
     population_stats.at[0, 'Avg_points'] -= population.at[index, 'Points'] / POP_SIZE
@@ -230,7 +274,7 @@ def add_child_to_population_cull_weakest(index):
     
     #print('Removed:')
     #print(population.iloc[index])
-    population.iloc[index,:] = temp_offspring.iloc[0,:].values
+    population.iloc[index,:] = temp_offspring.iloc[offspring_num,:].values
     calculate_fitness(population, index)
     
     population_stats.at[0, 'Avg_points'] += population.at[index, 'Points'] / POP_SIZE
@@ -248,13 +292,27 @@ def add_child_to_population_cull_weakest(index):
     #print('Added:')
     #print(population.iloc[index])
     
-def find_weakest():
+def find_weakest(first_lowest):
     min_fitness = population.at[0, 'Fitness']
     index = 0
     
     for i in range(POP_SIZE):
-        if population.at[i, 'Fitness'] < min_fitness:
+        if i == first_lowest:
+            continue
+        if (population.at[i, 'Fitness'] < min_fitness):
             min_fitness = population.at[i, 'Fitness']
+            index = i
+    return index
+
+def find_strongest(first_highest):
+    max_fitness = population.at[0, 'Fitness']
+    index = 0
+    
+    for i in range(POP_SIZE):
+        if i == first_highest:
+            continue
+        if (population.at[i, 'Fitness'] < max_fitness):
+            max_fitness = population.at[i, 'Fitness']
             index = i
     return index
 
