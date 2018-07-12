@@ -5,7 +5,7 @@ import random
 # Definitions of changeable variables
 DATA = 'data/2017-1.csv'
 
-NUM_GENERATIONS = 100
+NUM_GENERATIONS = 500
 PERCENT_CHANCE_MUTATE = 5
 POP_SIZE = 100
 TEAM_SIZE = 9 # This is hardcoded for now
@@ -47,47 +47,38 @@ def crossover(generation):
     index = find_weakest()
     seed = SEED    
     
-    while(1):
-        # Get the parent genotypes encoded into a list of two lists
-        parent_index = select_parents()
-        parent_chromosomes = []
-        offspring_chromosome = []
-        parent_chromosomes.append(population.iloc[parent_index[0]].values.tolist())
-        parent_chromosomes.append(population.iloc[parent_index[1]].values.tolist())
-        
-        #print('Parent A')
-        #print(population.iloc[parent_index[0]])
-        #print('Parent B')
-        #print(population.iloc[parent_index[1]])
+    if generation == 44:
+        print("test")
     
-        # Randomly select genes from both parents to create offspring
-        for i in range(TEAM_SIZE):
-            offspring_chromosome.append(parent_chromosomes[random.randint(0, 1)][i])
-        
-        #Append the generation born information
-        offspring_chromosome.append(generation)
-        
-        # Append empty values for the meta-information carried by each individual
-        for i in range(5):
-            offspring_chromosome.append(None)
-        
-        # Place the offspring into the empty row reserved for children
-        temp_offspring.iloc[0] = offspring_chromosome
-        
-        if random_bool(PERCENT_CHANCE_MUTATE):
-            mutate(temp_offspring, 0, seed)
-        
-        calculate_fitness(temp_offspring, 0)
-        
-        #Only stop when we have created an offspring that will improve the genepool
-        if  temp_offspring.at[0,'Fitness'] > LEAST_FIT:
-            break
-        seed += 1
-        random.seed(seed)
-        
+    # Get the parent genotypes encoded into a list of two lists
+    parent_index = select_parents()
+    parent_chromosomes = []
+    offspring_chromosome = []
+    parent_chromosomes.append(population.iloc[parent_index[0]].values.tolist())
+    parent_chromosomes.append(population.iloc[parent_index[1]].values.tolist())
     
+    #print('Parent A')
+    #print(population.iloc[parent_index[0]])
+    #print('Parent B')
+    #print(population.iloc[parent_index[1]])
+
+    # Randomly select genes from both parents to create offspring
+    for i in range(TEAM_SIZE):
+        offspring_chromosome.append(parent_chromosomes[random.randint(0, 1)][i])
     
+    #Append the generation born information
+    offspring_chromosome.append(generation)
     
+    # Append empty values for the meta-information carried by each individual
+    for i in range(5):
+        offspring_chromosome.append(None)
+    
+    # Place the offspring into the empty row reserved for children
+    temp_offspring.iloc[0] = offspring_chromosome
+    
+    if random_bool(PERCENT_CHANCE_MUTATE):
+        mutate(temp_offspring, 0, seed)
+        
     add_child_to_population_cull_weakest(index)
     
 #Mutate random element of offspring
@@ -102,7 +93,7 @@ def select_parents():
     
     while (parents_selected < 2):
         for i in np.arange(0, POP_SIZE):
-            if random_bool(population.at[i, 'Selection_chance'] * 100):
+            if random_bool(population.at[i, 'Selection_chance']):
                 parents_selected += 1
                 selected.append(i)
                 break
@@ -130,8 +121,8 @@ def setup():
         
     update_all_stats()
     
-    for i in np.arange(0, POP_SIZE):
-        update_selection_probability(i)
+   
+    update_selection_probability()
     
         
 #Update the fitness and related information for a given individual referred to by index within the population          
@@ -156,32 +147,37 @@ def calculate_fitness(df, index):
         fitness -= (team_salary - SALARY_CAP)
         compliant = False
         
-    if pos_count[0] > NUM_QB:
-        fitness -= (pos_count[0] - NUM_QB) * 1000
+    if pos_count[0] == NUM_QB:
+        fitness += 10000
+    else:
         compliant = False
         
-    if pos_count[1] > NUM_RB:
-        fitness -= (pos_count[1] - NUM_RB + 1) * 1000
+    if ((pos_count[1] == NUM_RB) or (pos_count[1] == NUM_RB + 1)):
+        fitness += 10000
+    else:
         compliant = False
         
-    if pos_count[2] > NUM_WR:
-        fitness -= (pos_count[2] - NUM_WR + 1) * 1000
+    if ((pos_count[2] == NUM_WR) or (pos_count[2] == NUM_WR + 1)):
+        fitness += 10000
+    else:
         compliant = False
         
-    if pos_count[3] > NUM_TE:
-        fitness -= (pos_count[3] - NUM_TE + 1) * 1000
+    if ((pos_count[3] == NUM_TE) or (pos_count[3] == NUM_TE + 1)):
+        fitness += 10000
+    else:
         compliant = False
         
-    if pos_count[4] > NUM_DEF:
-        fitness -= (pos_count[4] - NUM_DEF) * 1000
+    if pos_count[4] == NUM_QB:
+        fitness += 10000
+    else:
         compliant = False
         
-    if pos_count[1] + pos_count[2] + pos_count[3] > NUM_RB + NUM_WR + NUM_QB:
+    if pos_count[1] + pos_count[2] + pos_count[3] > NUM_RB + NUM_WR + NUM_QB + 1:
         fitness -= (pos_count[1] + pos_count[2] + pos_count[3] - NUM_RB + NUM_WR + NUM_QB) * 1000
         compliant = False
         
     if compliant == True:
-        fitness += 10000
+        fitness += 30000
     
     if fitness < LEAST_FIT:
         fitness = LEAST_FIT
@@ -246,31 +242,31 @@ def add_child_to_population_cull_weakest(index):
     if population.at[index, 'Compliant'] == True:
         population_stats.at[0, 'Num_compliant'] += 1
     
-    for i in range(POP_SIZE):
-        update_selection_probability(i)
+    
+    update_selection_probability()
     
     #print('Added:')
     #print(population.iloc[index])
     
 def find_weakest():
-    max_fitness = 0
-    index = None
+    min_fitness = population.at[0, 'Fitness']
+    index = 0
     
     for i in range(POP_SIZE):
-        if population.at[i, 'Fitness'] > max_fitness:
-            max_fitness = population.at[i, 'Fitness']
+        if population.at[i, 'Fitness'] < min_fitness:
+            min_fitness = population.at[i, 'Fitness']
             index = i
-            
     return index
 
-# Update the selection chance for a given index    
-def update_selection_probability(index):
-    probability = population.at[index, 'Fitness'] / population_stats.at[0, 'Total_fitness']
-    population.at[index, 'Selection_chance'] = probability
+# Update the selection chance for all population  
+def update_selection_probability():
+     for index in np.arange(0, POP_SIZE):
+        probability = population.at[index, 'Fitness'] / population_stats.at[0, 'Total_fitness']
+        population.at[index, 'Selection_chance'] = probability
     
 # Returns random bool based on percentage
 def random_bool(percent):
-    return random.randrange(100) < percent
+    return random.uniform(0,1) < percent
         
 
 def pos_dict(x):
