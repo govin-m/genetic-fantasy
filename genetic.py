@@ -178,12 +178,14 @@ def calculate_fitness(df, index):
     team_salary = 0
     pos_count = [0, 0, 0, 0, 0] # QB, RB, WR, TE, Def
     compliant = True
+    player_GID = [0,0,0,0,0,0,0,0,0]
     
     for i in range(TEAM_SIZE):
         player_data = data.loc[data['GID'] == chromosome.iloc[i]]
         team_points += player_data.iloc[0]['DK points']
         team_salary += player_data.iloc[0]['DK salary']
         pos_count[pos_dict(player_data.iloc[0]['Pos'])] += 1
+        player_GID[i] = player_data.iloc[0]['GID']
     
     fitness = team_points * 1000
     
@@ -219,7 +221,12 @@ def calculate_fitness(df, index):
     if pos_count[1] + pos_count[2] + pos_count[3] > NUM_RB + NUM_WR + NUM_QB + 1:
         fitness -= (pos_count[1] + pos_count[2] + pos_count[3] - NUM_RB + NUM_WR + NUM_QB) * 1000
         compliant = False
-        
+    
+    x = repeated_players(player_GID)
+    if x > 0:
+        fitness -= 20000 * x
+        compliant = False
+    
     if compliant == True:
         fitness += 30000
     
@@ -336,6 +343,16 @@ def pos_dict(x):
          'Def': 4,
     }[x]
         
-
+def repeated_players(list):
+    count = 0
+    for i in range(0,len(list)):
+        for j in range(i+1,len(list)):
+#            print(str(i) + " , " + str(j))
+#            print("["+str(list[i]) + "] , ]" + str(list[j]) +"]")
+            if list[i] == list[j]:
+              count += 1
+              break
+    return count
+    
 if __name__ == '__main__':
     main()
